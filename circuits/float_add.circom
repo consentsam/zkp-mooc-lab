@@ -142,26 +142,27 @@ template LessThan(n) {
 /*
  * Outputs `out` = 1 if `in` is at most `b` bits long, and 0 otherwise.
  */
-template CheckBitLength(b) {
-    assert(b < 254);
+ template CheckBitLength(b) {
+    assert(b < 252);
     signal input in;
     signal output out;
 
-    signal bits[b];
+    signal bits_representation_of_number[b];
+
+    var sum = 0;
     for (var i = 0; i < b; i++) {
-        bits[i] <-- (in >> i) & 1;
-        bits[i] * (1 - bits[i]) === 0;
+        bits_representation_of_number[i] <-- (in >> i) & 1;
+        bits_representation_of_number[i] * (bits_representation_of_number[i] - 1) === 0;
+        sum+= bits_representation_of_number[i] * 2**i;
     }
-    var sum_of_bits = 0;
-    for (var i = 0; i < b; i++)
-        sum_of_bits += (1 << i) * bits[i];
-    
-    component isz = IsZero();
+    component areValuesEqual = IsEqual();
+    areValuesEqual.in[0] <== in;
+    areValuesEqual.in[1] <== sum;
 
-    in - sum_of_bits ==> isz.in;
-
-    isz.out ==> out;
+    out <== areValuesEqual.out;
 }
+
+
 
 /*
  * Enforces the well-formedness of an exponent-mantissa pair (e, m), which is defined as follows:
