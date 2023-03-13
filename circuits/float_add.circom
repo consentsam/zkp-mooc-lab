@@ -343,24 +343,30 @@ template MSNZB(b) {
     signal input skip_checks;
     signal output one_hot[b];
 
-    component inBits = Num2Bits(b);
-    inBits.in <== in;
+    component is_input_zero = IsZero();
+    is_input_zero.in <== in;
+
+    skip_checks*(1-skip_checks)===0;
+    is_input_zero.out * ( 1- skip_checks)===0;
+
+    component number_to_bits = Num2Bits(b);
+    number_to_bits.in <== in;
 
     signal prod[b];
     prod[b-1] <== 1;
     for (var i = b-2; i >= 0; i--) {
-        prod[i] <== prod[i+1] * (1 - inBits.bits[i+1]);
+        prod[i] <== prod[i+1] * (1 - number_to_bits.bits[i+1]);
     }
 
     for (var i = 0; i < b; i++)
-        one_hot[i] <== inBits.bits[i] * prod[i];
+        one_hot[i] <== number_to_bits.bits[i] * prod[i];
     
-    component checker = IfThenElse();
-    checker.cond <== skip_checks;
-    checker.L <== 0;
-    checker.R <== prod[0] * (1-inBits.bits[0]);
+    component if_else_condition_executor = IfThenElse();
+    if_else_condition_executor.cond <== skip_checks;
+    if_else_condition_executor.L <== 0;
+    if_else_condition_executor.R <== prod[0] * (1-number_to_bits.bits[0]);
 
-    checker.out === 0;
+    if_else_condition_executor.out === 0;
 }
 
 /*
