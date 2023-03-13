@@ -147,6 +147,7 @@ template CheckBitLength(b) {
     signal input in;
     signal output out;
 
+    // TODO
     signal bits[b];
     for (var i = 0; i < b; i++) {
         bits[i] <-- (in >> i) & 1;
@@ -214,6 +215,9 @@ template RightShift(b, shift) {
     1 === x_length_validity.out;
 
     signal shiftedX <-- x >> shift;
+
+    // if x is shifted by 'shift' bits
+    // then the shifted bits that disappears must be less than 2^(shift+1)
 
     signal shiftedBits <-- x - (shiftedX << shift);
     component lessThan = LessThan(shift+1);
@@ -283,6 +287,7 @@ template LeftShift(shift_bound) {
     signal input skip_checks;
     signal output y;
 
+    // TODO
     component isEqual[shift_bound];
     var sum = 0;
 
@@ -323,6 +328,7 @@ template MSNZB(b) {
     signal input skip_checks;
     signal output one_hot[b];
 
+    // TODO
     component inBits = Num2Bits(b);
     inBits.in <== in;
 
