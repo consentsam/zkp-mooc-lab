@@ -152,8 +152,8 @@ template LessThan(n) {
     var sum = 0;
     for (var i = 0; i < b; i++) {
         bits_representation_of_number[i] <-- (in >> i) & 1;
-        bits_representation_of_number[i] * (bits_representation_of_number[i] - 1) === 0;
-        sum+= bits_representation_of_number[i] * 2**i;
+        bits_representation_of_number[i] * ( 1 - bits_representation_of_number[i]) === 0;
+        sum+= (2**i) * bits_representation_of_number[i] ;
     }
     component areValuesEqual = IsEqual();
     areValuesEqual.in[0] <== in;
@@ -205,7 +205,7 @@ template CheckWellFormedness(k, p) {
 /*
  * Right-shifts `b`-bit long `x` by `shift` bits to output `y`, where `shift` is a public circuit parameter.
  */
-template RightShift(b, shift) {
+/* template RightShift(b, shift) {
     assert(shift < b);
     signal input x;
     signal output y;
@@ -223,8 +223,41 @@ template RightShift(b, shift) {
     lessThan.out === 1;
 
     y <== shiftedX;
-}
+} */
 
+/* template RightShift(b, shift) {
+    assert(shift < b);
+    signal input x;
+    signal output y;
+
+    component num2Bits = Num2Bits(b);
+    num2Bits.in <== x;
+    signal in_bits[b] <== num2Bits.bits;
+
+    var shifted_x = 0;
+    for (var i = 0; i < b - shift; i++) {
+        shifted_x += 2**i * in_bits[i + shift];
+    }
+    y <== shifted_x;
+} */
+
+
+template RightShift(b, shift) {
+    assert(shift < b);
+    signal input x;
+    signal output y;
+
+    component check_bit_length_of_x = CheckBitLength(b);
+    check_bit_length_of_x.in <== x;
+    check_bit_length_of_x.out === 1;
+
+    y <-- x >> shift;
+
+    component check_bit_length_of_y = CheckBitLength(shift);
+    check_bit_length_of_y.in <== x - y * (1 << shift);
+    check_bit_length_of_y.out === 1;
+
+}
 /*
  * Rounds the input floating-point number and checks to ensure that rounding does not make the mantissa unnormalized.
  * Rounding is necessary to prevent the bitlength of the mantissa from growing with each successive operation.
