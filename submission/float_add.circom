@@ -142,27 +142,27 @@ template LessThan(n) {
 /*
  * Outputs `out` = 1 if `in` is at most `b` bits long, and 0 otherwise.
  */
-template CheckBitLength(b) {
-    assert(b < 254);
+ template CheckBitLength(b) {
+    assert(b < 252);
     signal input in;
     signal output out;
 
-    // TODO
-    signal bits[b];
+    signal bits_representation_of_number[b];
+
+    var sum = 0;
     for (var i = 0; i < b; i++) {
-        bits[i] <-- (in >> i) & 1;
-        bits[i] * (1 - bits[i]) === 0;
+        bits_representation_of_number[i] <-- (in >> i) & 1;
+        bits_representation_of_number[i] * ( 1 - bits_representation_of_number[i]) === 0;
+        sum+= (2**i) * bits_representation_of_number[i] ;
     }
-    var sum_of_bits = 0;
-    for (var i = 0; i < b; i++)
-        sum_of_bits += (1 << i) * bits[i];
-    
-    component isz = IsZero();
+    component areValuesEqual = IsEqual();
+    areValuesEqual.in[0] <== in;
+    areValuesEqual.in[1] <== sum;
 
-    in - sum_of_bits ==> isz.in;
-
-    isz.out ==> out;
+    out <== areValuesEqual.out;
 }
+
+
 
 /*
  * Enforces the well-formedness of an exponent-mantissa pair (e, m), which is defined as follows:
@@ -205,7 +205,7 @@ template CheckWellFormedness(k, p) {
 /*
  * Right-shifts `b`-bit long `x` by `shift` bits to output `y`, where `shift` is a public circuit parameter.
  */
-template RightShift(b, shift) {
+/* template RightShift(b, shift) {
     assert(shift < b);
     signal input x;
     signal output y;
@@ -216,9 +216,6 @@ template RightShift(b, shift) {
 
     signal shiftedX <-- x >> shift;
 
-    // if x is shifted by 'shift' bits
-    // then the shifted bits that disappears must be less than 2^(shift+1)
-
     signal shiftedBits <-- x - (shiftedX << shift);
     component lessThan = LessThan(shift+1);
     lessThan.in[0] <== shiftedBits;
@@ -226,8 +223,41 @@ template RightShift(b, shift) {
     lessThan.out === 1;
 
     y <== shiftedX;
-}
+} */
 
+/* template RightShift(b, shift) {
+    assert(shift < b);
+    signal input x;
+    signal output y;
+
+    component num2Bits = Num2Bits(b);
+    num2Bits.in <== x;
+    signal in_bits[b] <== num2Bits.bits;
+
+    var shifted_x = 0;
+    for (var i = 0; i < b - shift; i++) {
+        shifted_x += 2**i * in_bits[i + shift];
+    }
+    y <== shifted_x;
+} */
+
+
+template RightShift(b, shift) {
+    assert(shift < b);
+    signal input x;
+    signal output y;
+
+    component check_bit_length_of_x = CheckBitLength(b);
+    check_bit_length_of_x.in <== x;
+    check_bit_length_of_x.out === 1;
+
+    y <-- x >> shift;
+
+    component check_bit_length_of_y = CheckBitLength(shift);
+    check_bit_length_of_y.in <== x - y * (1 << shift);
+    check_bit_length_of_y.out === 1;
+
+}
 /*
  * Rounds the input floating-point number and checks to ensure that rounding does not make the mantissa unnormalized.
  * Rounding is necessary to prevent the bitlength of the mantissa from growing with each successive operation.
@@ -287,33 +317,18 @@ template LeftShift(shift_bound) {
     signal input skip_checks;
     signal output y;
 
-    // TODO
-    component isEqual[shift_bound];
-    var sum = 0;
+    component is_shift_less_than_shift_bound = LessThan(shift_bound);
+    is_shift_less_than_shift_bound.in[0] <== shift;
+    is_shift_less_than_shift_bound.in[1] <== shift_bound;
 
-    for (var i = 0; i < shift_bound; i++) {
-        isEqual[i] = IsEqual();
+    component if_else_condition_executor = IfThenElse();
+    if_else_condition_executor.cond <== skip_checks;
+    if_else_condition_executor.L <== 1;
+    if_else_condition_executor.R <== is_shift_less_than_shift_bound.out;
+    
+    if_else_condition_executor.out === 1;
 
-        isEqual[i].in[0] <== i;
-        isEqual[i].in[1] <== shift;
-        sum += isEqual[i].out * (1<<i);
-    }
-
-    y <== sum * x;
-
-    var shift_bound_bit = 0;
-    while ((1<<shift_bound_bit) <= shift_bound) shift_bound_bit++;
-
-    component Compare = LessThan(shift_bound_bit);
-    shift ==> Compare.in[0];
-    shift_bound ==> Compare.in[1];   
-
-    component checker = IfThenElse();
-    checker.cond <== skip_checks;
-    checker.L <== 1;
-    checker.R <== Compare.out;
-
-    checker.out === 1;
+    y <-- x << shift;
 }
 
 /*
@@ -328,25 +343,30 @@ template MSNZB(b) {
     signal input skip_checks;
     signal output one_hot[b];
 
-    // TODO
-    component inBits = Num2Bits(b);
-    inBits.in <== in;
+    component is_input_zero = IsZero();
+    is_input_zero.in <== in;
+
+    skip_checks*(1-skip_checks)===0;
+    is_input_zero.out * ( 1- skip_checks)===0;
+
+    component number_to_bits = Num2Bits(b);
+    number_to_bits.in <== in;
 
     signal prod[b];
     prod[b-1] <== 1;
     for (var i = b-2; i >= 0; i--) {
-        prod[i] <== prod[i+1] * (1 - inBits.bits[i+1]);
+        prod[i] <== prod[i+1] * (1 - number_to_bits.bits[i+1]);
     }
 
     for (var i = 0; i < b; i++)
-        one_hot[i] <== inBits.bits[i] * prod[i];
+        one_hot[i] <== number_to_bits.bits[i] * prod[i];
     
-    component checker = IfThenElse();
-    checker.cond <== skip_checks;
-    checker.L <== 0;
-    checker.R <== prod[0] * (1-inBits.bits[0]);
+    component if_else_condition_executor = IfThenElse();
+    if_else_condition_executor.cond <== skip_checks;
+    if_else_condition_executor.L <== 0;
+    if_else_condition_executor.R <== prod[0] * (1-number_to_bits.bits[0]);
 
-    checker.out === 0;
+    if_else_condition_executor.out === 0;
 }
 
 /*
